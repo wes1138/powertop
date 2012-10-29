@@ -267,6 +267,35 @@ void make_report(int time, char *workload, int iterations, char *file)
 	exit(0);
 }
 
+void make_tunables_script(int time, char *workload, int iterations, char *file)
+{
+
+	/* one to warm up everything */
+	fprintf(stderr, _("Preparing to take measurements\n"));
+	utf_ok = 0;
+	measure_tunables(1, NULL);
+
+	if (!workload[0])
+	  fprintf(stderr, _("Taking %d measurement(s) for a duration of %d second(s) each.\n"),iterations,time);
+	else
+	   fprintf(stderr, _("Measuring workload %s.\n"), workload);
+	for (int i=0; i != iterations; i++){
+		init_report_output(file, iterations);
+		initialize_tuning();
+		/* and then the real measurement */
+		measure_tunables(time, workload);
+		report_show_tunables();
+		finish_report_output();
+		clear_tuning();
+	}
+	/* and wrap up */
+	//learn_parameters(50, 0);
+	//save_all_results("saved_results.powertop");
+	//save_parameters("saved_parameters.powertop");
+	end_pci_access();
+	exit(0);
+}
+
 static void checkroot() {
 	int uid;
 	uid = getuid();
@@ -404,6 +433,7 @@ int main(int argc, char **argv)
 				reporttype = REPORT_SH;
 				sprintf(filename, "%s", optarg ? optarg : "powertop.sh");
 				break;
+
 			case '?': /* Unknown option */
 				/* getopt_long already printed an error message. */
 				exit(0);
@@ -414,7 +444,13 @@ int main(int argc, char **argv)
 	powertop_init();
 
 	if (reporttype != REPORT_OFF)
-		make_report(time_out, workload, iterations, filename);
+	{
+		if (reporttype == REPORT_SH) {
+			// call your not yet done function.
+		}
+		else
+			make_report(time_out, workload, iterations, filename);
+	}
 
 	if (debug_learning)
 		printf("Learning debugging enabled\n");

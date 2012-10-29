@@ -154,6 +154,7 @@ void init_report_output(char *filename_str, int iterations)
 	time_t stamp;
 	char datestr[200];
 
+	// TODO: update for shell script?  or write a new one?
 	string mystring = string(filename_str);
 	sprintf(file_postfix, "%s",
 		(reporttype == REPORT_HTML ? "html" : "csv"));
