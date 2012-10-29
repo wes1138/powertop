@@ -65,13 +65,21 @@ public:
 	void begin_paragraph();
 	void end_paragraph();
 
+	void add(const char *str);
+	void addv(const char *fmt, va_list ap);
+
+
 private:
+	// for convenience when we want to access the superclass:
+	typedef report_formatter_string_base super;
 	void add_doc_header();
 
 	void add_quotes();
 
 	std::string escape_string(const char *str);
 
+	bool ignore_row;
+	bool is_description;
 	bool csv_need_quotes;
 	size_t table_cell_number, text_start;
 };

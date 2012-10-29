@@ -99,6 +99,8 @@ report_formatter_sh::begin_row(row_type rtype)
 	// you'll then get two entries; the first being the
 	// description, and the second the shell command.
 	// NOTE: you get these two from calls to begin_cell()
+	this->ignore_row = (rtype != ROW_TUNABLE_BAD);
+	this->is_description = true; // description comes first.
 	table_cell_number = 0;
 }
 
@@ -115,6 +117,12 @@ report_formatter_sh::end_row()
 void
 report_formatter_sh::begin_cell(cell_type ctype)
 {
+	// filter out all but the tunable settings.
+	if (this->ignore_row) return;
+	if (this->is_description) // print with comments:
+		addf_exact("# ");
+	// the rest of the printing is done via the report_maker interface,
+	// which means we need to overload add?
 	// TODO: You will get this information from tuning.cpp (and others!)
 	// so you need to distinguish between calls to ->description() and
 	// ->toggle_script().  Maybe a report is not the way to go here.
@@ -123,6 +131,7 @@ report_formatter_sh::begin_cell(cell_type ctype)
 	 * parameter is ROW_TUNABLE_BAD, indicating that the next call here
 	 * will be the description.
 	 * */
+	// TODO: delete this.
 	if (table_cell_number > 0) {
 		addf_exact("%c", REPORT_CSV_DELIMITER);
 #ifdef REPORT_CSV_ADD_SPACE
@@ -132,6 +141,19 @@ report_formatter_sh::begin_cell(cell_type ctype)
 
 	text_start = result.length();
 	csv_need_quotes = false;
+}
+
+
+void report_formatter_sh::add(const char *str)
+{
+	if (this->ignore_row) return;
+	super::add(str);
+}
+
+void report_formatter_sh::addv(const char *fmt, va_list ap)
+{
+	if (this->ignore_row) return;
+	super::addv(fmt,ap);
 }
 
 /* ************************************************************************ */

@@ -78,6 +78,7 @@ static const struct option long_options[] =
 	{"iteration", optional_argument, NULL, 'i'},
 	{"workload", optional_argument, NULL, 'w'},
 	{"quiet", optional_argument, NULL, 'q'},
+	{"script", optional_argument, NULL, 's'},
 	{NULL, 0, NULL, 0}
 };
 
@@ -348,7 +349,7 @@ int main(int argc, char **argv)
 	textdomain (PACKAGE);
 
 	while (1) { /* parse commandline options */
-		c = getopt_long (argc, argv, "ch:C:i:t:uVw:q", long_options, &option_index);
+		c = getopt_long (argc, argv, "ch:C:i:t:uVw:qs:", long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -397,6 +398,11 @@ int main(int argc, char **argv)
 			case 'C': /* csv report*/
 				reporttype = REPORT_CSV;
 				sprintf(filename, "%s", optarg ? optarg : "powertop.csv");
+				break;
+
+			case 's': /* shell script for tunables */
+				reporttype = REPORT_SH;
+				sprintf(filename, "%s", optarg ? optarg : "powertop.sh");
 				break;
 			case '?': /* Unknown option */
 				/* getopt_long already printed an error message. */
