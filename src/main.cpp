@@ -78,6 +78,7 @@ static const struct option long_options[] =
 	{"iteration", optional_argument, NULL, 'i'},
 	{"workload", optional_argument, NULL, 'w'},
 	{"quiet", optional_argument, NULL, 'q'},
+	{"script", optional_argument, NULL, 's'},
 	{NULL, 0, NULL, 0}
 };
 
@@ -109,6 +110,7 @@ static void print_usage()
 	printf("--extech%s \t %s\n",_("[=devnode]"),_("uses an Extech Power Analyzer for measurements"));
 	printf("--html%s \t %s\n",_("[=FILENAME]"),_("generate a html report"));
 	printf("--csv%s \t %s\n",_("[=FILENAME]"),_("generate a csv report"));
+	printf("--script%s \t %s\n",_("[=FILENAME]"),_("generate a shell script for tunables"));
 	printf("--time%s \t %s\n",_("[=seconds]"), _("generate a report for 'x' seconds"));
 	printf("--iteration%s\n", _("[=iterations] number of times to run each test"));
 	printf("--workload%s \t %s\n", _("[=workload]"), _("file to execute for workload"));
@@ -340,6 +342,7 @@ int main(int argc, char **argv)
 	char filename[4096];
 	char workload[4096] = {0,};
 	int  iterations = 1;
+	bool make_tuning_script = false;
 
 	set_new_handler(out_of_memory);
 
@@ -348,7 +351,7 @@ int main(int argc, char **argv)
 	textdomain (PACKAGE);
 
 	while (1) { /* parse commandline options */
-		c = getopt_long (argc, argv, "ch:C:i:t:uVw:q", long_options, &option_index);
+		c = getopt_long (argc, argv, "ch:C:i:t:uVw:qs:", long_options, &option_index);
 		/* Detect the end of the options. */
 		if (c == -1)
 			break;
@@ -391,13 +394,19 @@ int main(int argc, char **argv)
 				break;
 			case 'q':
 				if(freopen("/dev/null", "a", stderr))
-					fprintf(stderr, _("Quite mode failed!\n"));
+					fprintf(stderr, _("Quiet mode failed!\n"));
 				break;
 
 			case 'C': /* csv report*/
 				reporttype = REPORT_CSV;
 				sprintf(filename, "%s", optarg ? optarg : "powertop.csv");
 				break;
+
+			case 's': /* shell script for tunables */
+				make_tuning_script = true;
+				sprintf(filename, "%s", optarg ? optarg : "powertop.sh");
+				break;
+
 			case '?': /* Unknown option */
 				/* getopt_long already printed an error message. */
 				exit(0);
@@ -406,6 +415,16 @@ int main(int argc, char **argv)
 	}
 
 	powertop_init();
+
+	if (make_tuning_script) {
+		// for now, let's make the script and exit.
+		// Is powertop_init() needed?  Probably not, but we'll try
+		// it out both ways.
+		make_tunables_script(filename);
+		clear_tuning();
+		end_pci_access(); // TODO: remove?
+		exit(0);
+	}
 
 	if (reporttype != REPORT_OFF)
 		make_report(time_out, workload, iterations, filename);
