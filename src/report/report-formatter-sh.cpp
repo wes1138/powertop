@@ -68,25 +68,9 @@ report_formatter_sh::add_header(const char *header, int level)
 
 	text_start = result.length();
 	csv_need_quotes = false;
-	addf("%.*s%s%.*s", 4 - level, "***", header, 4 - level, "***");
+	addf("# %.*s%s%.*s", 4 - level, "***", header, 4 - level, "***");
 	add_quotes();
 	add_exact("\n");
-}
-
-/* ************************************************************************ */
-
-void
-report_formatter_sh::begin_section(section_type stype)
-{
-	/* Do nothing special */
-}
-
-/* ************************************************************************ */
-
-void
-report_formatter_sh::end_section()
-{
-	/* Do nothing special */
 }
 
 /* ************************************************************************ */
@@ -110,6 +94,7 @@ report_formatter_sh::end_table()
 void
 report_formatter_sh::begin_row(row_type rtype)
 {
+	// TODO: not sure if you need this or not.
 	table_cell_number = 0;
 }
 
@@ -126,6 +111,7 @@ report_formatter_sh::end_row()
 void
 report_formatter_sh::begin_cell(cell_type ctype)
 {
+	// TODO: I think you can get rid of this.  As well as the cell_number.
 	if (table_cell_number > 0) {
 		addf_exact("%c", REPORT_CSV_DELIMITER);
 #ifdef REPORT_CSV_ADD_SPACE
@@ -159,14 +145,6 @@ report_formatter_sh::end_cell()
 {
 	add_quotes();
 	table_cell_number++;
-}
-
-/* ************************************************************************ */
-
-void
-report_formatter_sh::add_empty_cell()
-{
-	/* Do nothing special */
 }
 
 /* ************************************************************************ */
@@ -213,12 +191,4 @@ report_formatter_sh::escape_string(const char *str)
 	}
 
 	return res;
-}
-
-/* ************************************************************************ */
-
-void
-report_formatter_sh::set_cpu_number(int nr UNUSED)
-{
-	/* Do nothing */
 }
