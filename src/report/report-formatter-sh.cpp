@@ -94,7 +94,11 @@ report_formatter_sh::end_table()
 void
 report_formatter_sh::begin_row(row_type rtype)
 {
-	// TODO: not sure if you need this or not.
+	// TODO: whenever you are passed row_type as
+	// ROW_TUNABLE_BAD, then you should be listening.
+	// you'll then get two entries; the first being the
+	// description, and the second the shell command.
+	// NOTE: you get these two from calls to begin_cell()
 	table_cell_number = 0;
 }
 
@@ -111,7 +115,14 @@ report_formatter_sh::end_row()
 void
 report_formatter_sh::begin_cell(cell_type ctype)
 {
-	// TODO: I think you can get rid of this.  As well as the cell_number.
+	// TODO: You will get this information from tuning.cpp (and others!)
+	// so you need to distinguish between calls to ->description() and
+	// ->toggle_script().  Maybe a report is not the way to go here.
+	// Perhaps starting more from scratch is desirable : (
+	/* Update: upon begin_row, you should set a switch to be 0, if the
+	 * parameter is ROW_TUNABLE_BAD, indicating that the next call here
+	 * will be the description.
+	 * */
 	if (table_cell_number > 0) {
 		addf_exact("%c", REPORT_CSV_DELIMITER);
 #ifdef REPORT_CSV_ADD_SPACE
