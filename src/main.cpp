@@ -110,6 +110,7 @@ static void print_usage()
 	printf("--extech%s \t %s\n",_("[=devnode]"),_("uses an Extech Power Analyzer for measurements"));
 	printf("--html%s \t %s\n",_("[=FILENAME]"),_("generate a html report"));
 	printf("--csv%s \t %s\n",_("[=FILENAME]"),_("generate a csv report"));
+	printf("--script%s \t %s\n",_("[=FILENAME]"),_("generate a shell script for tunables"));
 	printf("--time%s \t %s\n",_("[=seconds]"), _("generate a report for 'x' seconds"));
 	printf("--iteration%s\n", _("[=iterations] number of times to run each test"));
 	printf("--workload%s \t %s\n", _("[=workload]"), _("file to execute for workload"));
