@@ -87,8 +87,7 @@
 enum report_type {
 	REPORT_OFF,
 	REPORT_HTML,
-	REPORT_CSV,
-	REPORT_SH
+	REPORT_CSV
 };
 
 /* ************************************************************************ */

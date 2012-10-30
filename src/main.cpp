@@ -267,35 +267,6 @@ void make_report(int time, char *workload, int iterations, char *file)
 	exit(0);
 }
 
-void make_tunables_script(int time, char *workload, int iterations, char *file)
-{
-
-	/* one to warm up everything */
-	fprintf(stderr, _("Preparing to take measurements\n"));
-	utf_ok = 0;
-	measure_tunables(1, NULL);
-
-	if (!workload[0])
-	  fprintf(stderr, _("Taking %d measurement(s) for a duration of %d second(s) each.\n"),iterations,time);
-	else
-	   fprintf(stderr, _("Measuring workload %s.\n"), workload);
-	for (int i=0; i != iterations; i++){
-		init_report_output(file, iterations);
-		initialize_tuning();
-		/* and then the real measurement */
-		measure_tunables(time, workload);
-		report_show_tunables();
-		finish_report_output();
-		clear_tuning();
-	}
-	/* and wrap up */
-	//learn_parameters(50, 0);
-	//save_all_results("saved_results.powertop");
-	//save_parameters("saved_parameters.powertop");
-	end_pci_access();
-	exit(0);
-}
-
 static void checkroot() {
 	int uid;
 	uid = getuid();
@@ -370,6 +341,7 @@ int main(int argc, char **argv)
 	char filename[4096];
 	char workload[4096] = {0,};
 	int  iterations = 1;
+	bool make_tuning_script = false;
 
 	set_new_handler(out_of_memory);
 
@@ -430,7 +402,7 @@ int main(int argc, char **argv)
 				break;
 
 			case 's': /* shell script for tunables */
-				reporttype = REPORT_SH;
+				make_tuning_script = true;
 				sprintf(filename, "%s", optarg ? optarg : "powertop.sh");
 				break;
 
@@ -443,14 +415,18 @@ int main(int argc, char **argv)
 
 	powertop_init();
 
-	if (reporttype != REPORT_OFF)
-	{
-		if (reporttype == REPORT_SH) {
-			// call your not yet done function.
-		}
-		else
-			make_report(time_out, workload, iterations, filename);
+	if (make_tuning_script) {
+		// for now, let's make the script and exit.
+		// Is powertop_init() needed?  Probably not, but we'll try
+		// it out both ways.
+		make_tunables_script(filename);
+		clear_tuning();
+		end_pci_access(); // TODO: remove?
+		exit(0);
 	}
+
+	if (reporttype != REPORT_OFF)
+		make_report(time_out, workload, iterations, filename);
 
 	if (debug_learning)
 		printf("Learning debugging enabled\n");

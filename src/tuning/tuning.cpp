@@ -83,7 +83,35 @@ void initialize_tuning(void)
 	w->cursor_max = all_tunables.size() - 1;
 }
 
+void make_tunables_script(char *file)
+{
+	init_tuning();
+	sort_tunables();
 
+	// try to open the file for writing.
+	FILE* f = (file)?fopen(file,"w"):stdout;
+	if (!f) {
+		fprintf(stderr,"Error: cannot open file %s for writing",file);
+		return;
+	}
+
+	/* print shebang and some comments. */
+	fprintf(f,"#!/bin/bash\n\n");
+	fprintf(f,"###################################\n");
+	fprintf(f,"#######  PowerTOP Tunables  #######\n");
+	fprintf(f,"###################################\n\n");
+
+	for (size_t i = 0; i < all_tunables.size(); i++) {
+		if (all_tunables[i]->good_bad() != TUNE_BAD)
+			continue;
+		// TODO: it woudl be nice to categorize here.
+
+		fprintf(f,"# %s\n", all_tunables[i]->description());
+		fprintf(f,"%s\n\n", all_tunables[i]->toggle_script());
+	}
+	if (f != stderr)
+		fclose(f);
+}
 
 static void __tuning_update_display(int cursor_pos)
 {
