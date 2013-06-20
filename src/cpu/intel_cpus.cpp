@@ -22,7 +22,7 @@
  * Authors:
  *	Arjan van de Ven <arjan@linux.intel.com>
  */
-#include "cpu.h"
+#include "intel_cpus.h"
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
@@ -40,16 +40,9 @@
 #include "../parameters/parameters.h"
 #include "../display.h"
 
-static int is_turbo(uint64_t freq, uint64_t max, uint64_t maxmo)
-{
-	if (freq != max)
-		return 0;
-	if (maxmo + 1000 != max)
-		return 0;
-	return 1;
-}
 
 int has_c2c7_res;
+int has_c8c9c10_res;
 
 
 
@@ -57,30 +50,15 @@ static uint64_t get_msr(int cpu, uint64_t offset)
 {
 	ssize_t retval;
 	uint64_t msr;
-	int fd;
-	char msr_path[256];
 
-	fd = sprintf(msr_path, "/dev/cpu/%d/msr", cpu);
-
-	if (access(msr_path, R_OK) != 0){
-		fd = sprintf(msr_path, "/dev/msr%d", cpu);
-
-		if (access(msr_path, R_OK) != 0){
-			fprintf(stderr, _("msr reg not found"));
-			exit(-2);
-		}
-	}
-
-	fd = open(msr_path, O_RDONLY);
-
-	retval = pread(fd, &msr, sizeof msr, offset);
-	if (retval != sizeof msr) {
+	retval = read_msr(cpu, offset, &msr);
+	if (retval < 0) {
 		reset_display();
-		fprintf(stderr, _("pread cpu%d 0x%llx : "), cpu, (unsigned long long)offset);
+		fprintf(stderr, _("read_msr cpu%d 0x%llx : "), cpu, (unsigned long long)offset);
 		fprintf(stderr, "%s\n", strerror(errno));
 		exit(-2);
 	}
-	close(fd);
+
 	return msr;
 }
 
@@ -193,93 +171,6 @@ void nhm_core::measurement_end(void)
 	total_stamp = 0;
 }
 
-void nhm_core::account_freq(uint64_t freq, uint64_t duration)
-{
-	struct frequency *state = NULL;
-	unsigned int i;
-
-	for (i = 0; i < pstates.size(); i++) {
-		if (freq == pstates[i]->freq) {
-			state = pstates[i];
-			break;
-		}
-	}
-
-
-	if (!state) {
-		state = new(std::nothrow) struct frequency;
-
-		if (!state)
-			return;
-
-		memset(state, 0, sizeof(*state));
-
-		pstates.push_back(state);
-
-		state->freq = freq;
-		hz_to_human(freq, state->human_name);
-		if (freq == 0)
-			strcpy(state->human_name, _("Idle"));
-		if (is_turbo(freq, max_frequency, max_minus_one_frequency))
-			sprintf(state->human_name, _("Turbo Mode"));
-
-		state->after_count = 1;
-	}
-
-
-	state->time_after += duration;
-}
-
-
-void nhm_core::calculate_freq(uint64_t time)
-{
-	uint64_t freq = 0;
-	bool is_idle = true;
-	unsigned int i;
-
-
-	/* calculate the maximum frequency of all children */
-	for (i = 0; i < children.size(); i++)
-		if (children[i] && children[i]->has_pstates()) {
-			uint64_t f = 0;
-			if (!children[i]->idle) {
-				f = children[i]->current_frequency;
-				is_idle = false;
-			}
-			if (f > freq)
-				freq = f;
-		}
-
-	current_frequency = freq;
-	idle = is_idle;
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
-}
-
-void nhm_core::change_effective_frequency(uint64_t time, uint64_t frequency)
-{
-	uint64_t freq = 0;
-	uint64_t time_delta, fr;
-
-
-	if (last_stamp)
-		time_delta = time - last_stamp;
-	else
-		time_delta = 1;
-
-	fr = effective_frequency;
-
-	if (old_idle)
-		fr = 0;
-
-	account_freq(fr, time_delta);
-
-	effective_frequency = freq;
-	last_stamp = time;
-	abstract_cpu::change_effective_frequency(time, frequency);
-}
-
 char * nhm_core::fill_pstate_line(int line_nr, char *buffer)
 {
 	buffer[0] = 0;
@@ -343,6 +234,11 @@ void nhm_package::measurement_start(void)
 	c6_before    = get_msr(number, MSR_PKG_C6_RESIDENCY);
 	if (has_c2c7_res)
 		c7_before    = get_msr(number, MSR_PKG_C7_RESIDENCY);
+	if (has_c8c9c10_res) {
+		c8_before    = get_msr(number, MSR_PKG_C8_RESIDENCY);
+		c9_before    = get_msr(number, MSR_PKG_C9_RESIDENCY);
+		c10_before    = get_msr(number, MSR_PKG_C10_RESIDENCY);
+	}
 	tsc_before   = get_msr(first_cpu, MSR_TSC);
 
 	if (has_c2c7_res)
@@ -352,6 +248,11 @@ void nhm_package::measurement_start(void)
 	insert_cstate("pkg c6", "C6 (pc6)", 0, c6_before, 1);
 	if (has_c2c7_res)
 		insert_cstate("pkg c7", "C7 (pc7)", 0, c7_before, 1);
+	if (has_c8c9c10_res) {
+		insert_cstate("pkg c8", "C8 (pc8)", 0, c8_before, 1);
+		insert_cstate("pkg c9", "C9 (pc9)", 0, c9_before, 1);
+		insert_cstate("pkg c10", "C10 (pc10)", 0, c10_before, 1);
+	}
 }
 
 void nhm_package::measurement_end(void)
@@ -371,6 +272,11 @@ void nhm_package::measurement_end(void)
 	c6_after    = get_msr(number, MSR_PKG_C6_RESIDENCY);
 	if (has_c2c7_res)
 		c7_after    = get_msr(number, MSR_PKG_C7_RESIDENCY);
+	if (has_c8c9c10_res) {
+		c8_after = get_msr(number, MSR_PKG_C8_RESIDENCY);
+		c9_after = get_msr(number, MSR_PKG_C9_RESIDENCY);
+		c10_after = get_msr(number, MSR_PKG_C10_RESIDENCY);
+	}
 	tsc_after   = get_msr(first_cpu, MSR_TSC);
 
 	gettimeofday(&stamp_after, NULL);
@@ -384,6 +290,11 @@ void nhm_package::measurement_end(void)
 	finalize_cstate("pkg c6", 0, c6_after, 1);
 	if (has_c2c7_res)
 		finalize_cstate("pkg c7", 0, c7_after, 1);
+	if (has_c8c9c10_res) {
+		finalize_cstate("pkg c8", 0, c8_after, 1);
+		finalize_cstate("pkg c9", 0, c9_after, 1);
+		finalize_cstate("pkg c10", 0, c10_after, 1);
+	}
 
 	for (i = 0; i < children.size(); i++)
 		if (children[i])
@@ -425,91 +336,6 @@ void nhm_package::measurement_end(void)
 	total_stamp = 0;
 
 }
-
-void nhm_package::account_freq(uint64_t freq, uint64_t duration)
-{
-	struct frequency *state = NULL;
-	unsigned int i;
-
-	for (i = 0; i < pstates.size(); i++) {
-		if (freq == pstates[i]->freq) {
-			state = pstates[i];
-			break;
-		}
-	}
-
-
-	if (!state) {
-		state = new(std::nothrow) struct frequency;
-
-		if (!state)
-			return;
-
-		memset(state, 0, sizeof(*state));
-
-		pstates.push_back(state);
-
-		state->freq = freq;
-		hz_to_human(freq, state->human_name);
-		if (freq == 0)
-			strcpy(state->human_name, _("Idle"));
-		if (is_turbo(freq, max_frequency, max_minus_one_frequency))
-			sprintf(state->human_name, _("Turbo Mode"));
-		state->after_count = 1;
-	}
-
-	state->time_after += duration;
-
-}
-
-
-void nhm_package::calculate_freq(uint64_t time)
-{
-	uint64_t freq = 0;
-	bool is_idle = true;
-	unsigned int i;
-
-	/* calculate the maximum frequency of all children */
-	for (i = 0; i < children.size(); i++)
-		if (children[i] && children[i]->has_pstates()) {
-			uint64_t f = 0;
-			if (!children[i]->idle) {
-				f = children[i]->current_frequency;
-				is_idle = false;
-			}
-			if (f > freq)
-				freq = f;
-		}
-
-	current_frequency = freq;
-	idle = is_idle;
-	if (parent)
-		parent->calculate_freq(time);
-	change_effective_frequency(time, current_frequency);
-	old_idle = idle;
-}
-
-void nhm_package::change_effective_frequency(uint64_t time, uint64_t frequency)
-{
-	uint64_t time_delta, fr;
-
-	if (last_stamp)
-		time_delta = time - last_stamp;
-	else
-		time_delta = 1;
-
-	fr = effective_frequency;
-	if (old_idle)
-		fr = 0;
-
-	account_freq(fr, time_delta);
-
-	effective_frequency = frequency;
-	last_stamp = time;
-
-	abstract_cpu::change_effective_frequency(time, frequency);
-}
-
 
 void nhm_cpu::measurement_start(void)
 {
@@ -624,87 +450,4 @@ int nhm_cpu::has_pstate_level(int level)
 	if (level == LEVEL_C0)
 		return 1;
 	return cpu_linux::has_pstate_level(level);
-}
-
-void nhm_cpu::account_freq(uint64_t freq, uint64_t duration)
-{
-	struct frequency *state = NULL;
-	unsigned int i;
-
-
-	for (i = 0; i < pstates.size(); i++) {
-		if (freq == pstates[i]->freq) {
-			state = pstates[i];
-			break;
-		}
-	}
-
-	if (!state) {
-		state = new(std::nothrow) struct frequency;
-
-		if (!state)
-			return;
-
-		memset(state, 0, sizeof(*state));
-
-		pstates.push_back(state);
-
-		state->freq = freq;
-		hz_to_human(freq, state->human_name);
-		if (freq == 0)
-			strcpy(state->human_name, _("Idle"));
-		state->after_count = 1;
-	}
-
-
-	state->time_after += duration;
-
-
-}
-
-void nhm_cpu::change_freq(uint64_t time, int frequency)
-{
-	current_frequency = frequency;
-
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
-}
-
-void nhm_cpu::change_effective_frequency(uint64_t time, uint64_t frequency)
-{
-	uint64_t time_delta, fr;
-
-	if (last_stamp)
-		time_delta = time - last_stamp;
-	else
-		time_delta = 1;
-
-	fr = effective_frequency;
-	if (old_idle)
-		fr = 0;
-
-	account_freq(fr, time_delta);
-
-	effective_frequency = frequency;
-	last_stamp = time;
-}
-
-void nhm_cpu::go_idle(uint64_t time)
-{
-
-	idle = true;
-
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
-}
-
-
-void nhm_cpu::go_unidle(uint64_t time)
-{
-	idle = false;
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
 }

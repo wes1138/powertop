@@ -1,9 +1,6 @@
 AUTOMAKE_OPTIONS = subdir-objects
 ACLOCAL_AMFLAGS = -I ../m4 
 
-noinst_PROGRAMS = csstoh
-csstoh_SOURCES = csstoh.c 
-
 sbin_PROGRAMS = powertop
 nodist_powertop_SOURCES = css.h
 
@@ -34,7 +31,9 @@ powertop_SOURCES = parameters/persistent.cpp parameters/learn.cpp parameters/par
 		report/report-formatter-base.cpp report/report-formatter-base.h \
 		report/report-formatter-csv.cpp report/report-formatter-csv.h \
 		report/report-formatter-html.cpp report/report-formatter-html.h \
-		main.cpp css.h powertop.css cpu/intel_gpu.cpp
+		main.cpp css.h powertop.css cpu/intel_gpu.cpp \
+		cpu/rapl/rapl_interface.cpp cpu/cpu_rapl_device.cpp \
+		cpu/dram_rapl_device.cpp devices/gpu_rapl_device.cpp
 
 
 powertop_CXXFLAGS = -fno-omit-frame-pointer -fstack-protector -Wall -Wshadow -Wformat $(NCURSES_CFLAGS) $(PCIUTILS_CFLAGS) $(LIBNL_CFLAGS) $(GLIB2_CFLAGS)
@@ -48,6 +47,6 @@ AM_LDFLAGS = $(LIBS) $(NCURSES_LIBS) $(PCIUTILS_LIBS) $(LIBNL_LIBS) $(LIBZ_LIBS)
 
 BUILT_SOURCES = css.h
 CLEANFILES = css.h
-css.h: csstoh powertop.css
-	./csstoh "$(srcdir)"/powertop.css css.h
+css.h: powertop.css
+	$(SHELL) ./csstoh.sh powertop.css css.h
 

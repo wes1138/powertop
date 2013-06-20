@@ -20,39 +20,38 @@
  * or just google for it.
  *
  * Authors:
- *	Arjan van de Ven <arjan@linux.intel.com>
+ *	Srinivas Pandruvada <Srinivas.Pandruvada@linux.intel.com>
  */
-#ifndef _INCLUDE_GUARD_i915_GPU_H
-#define _INCLUDE_GUARD_i915_GPU_H
+#ifndef _INCLUDE_GUARD_CPU_RAPL_DEVICE_H
+#define _INCLUDE_GUARD_CPU_RAPL_DEVICE_H
 
+#include <vector>
+#include <string>
 
-#include "device.h"
+using namespace std;
 
-class i915gpu: public device {
-	int index;
-	int rindex;
-	vector<device *>child_devices;
+#include <sys/time.h>
+#include "cpudevice.h"
+#include "rapl/rapl_interface.h"
+
+class cpu_rapl_device: public cpudevice {
+
+	c_rapl_interface *rapl;
+	time_t		last_time;
+	double		last_energy;
+	double 		consumed_power;
+	bool		device_valid;
 
 public:
-
-	i915gpu();
-
+	cpu_rapl_device(cpudevice *parent, const char *classname = "cpu_core", const char *device_name = "cpu_core", class abstract_cpu *_cpu = NULL);
+	~cpu_rapl_device() { delete rapl; }
+	virtual const char * device_name(void) {return "CPU core";};
+	bool device_present() { return device_valid;}
+	virtual double power_usage(struct result_bundle *result, struct parameter_bundle *bundle);
 	virtual void start_measurement(void);
 	virtual void end_measurement(void);
 
-	virtual double	utilization(void); /* percentage */
-
-	virtual const char * class_name(void) { return "GPU";};
-
-	virtual const char * device_name(void);
-	virtual double power_usage(struct result_bundle *result, struct parameter_bundle *bundle);
-	virtual bool show_in_list(void) {return false;};
-	virtual const char * util_units(void) { return " ops/s"; };
-
-	virtual void add_child(device *dev_ptr) { child_devices.push_back(dev_ptr);}
 };
-
-extern void create_i915_gpu(void);
 
 
 #endif

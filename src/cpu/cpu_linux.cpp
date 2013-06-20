@@ -38,15 +38,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-static int is_turbo(uint64_t freq, uint64_t max, uint64_t maxmo)
-{
-	if (freq != max)
-		return 0;
-	if (maxmo + 1000 != max)
-		return 0;
-	return 1;
-}
-
 void cpu_linux::parse_cstates_start(void)
 {
 	ifstream file;
@@ -354,93 +345,4 @@ char * cpu_linux::fill_pstate_line(int line_nr, char *buffer)
 
 	sprintf(buffer," %5.1f%% ", percentage(1.0* (pstates[line_nr]->time_after) / total_stamp));
 	return buffer;
-}
-
-
-
-
-void cpu_linux::account_freq(uint64_t freq, uint64_t duration)
-{
-	struct frequency *state = NULL;
-	unsigned int i;
-
-
-	for (i = 0; i < pstates.size(); i++) {
-		if (freq == pstates[i]->freq) {
-			state = pstates[i];
-			break;
-		}
-	}
-
-	if (!state) {
-		state = new(std::nothrow) struct frequency;
-
-		if (!state)
-			return;
-
-		memset(state, 0, sizeof(*state));
-
-		pstates.push_back(state);
-
-		state->freq = freq;
-		hz_to_human(freq, state->human_name);
-		if (freq == 0)
-			strcpy(state->human_name, _("Idle"));
-		if (is_turbo(freq, max_frequency, max_minus_one_frequency))
-			sprintf(state->human_name, _("Turbo Mode"));
-
-		state->after_count = 1;
-	}
-
-
-	state->time_after += duration;
-
-
-}
-
-void cpu_linux::change_freq(uint64_t time, int frequency)
-{
-	current_frequency = frequency;
-
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
-}
-
-void cpu_linux::change_effective_frequency(uint64_t time, uint64_t frequency)
-{
-	uint64_t time_delta, fr;
-
-	if (last_stamp)
-		time_delta = time - last_stamp;
-	else
-		time_delta = 1;
-
-	fr = effective_frequency;
-	if (old_idle)
-		fr = 0;
-
-	account_freq(fr, time_delta);
-
-	effective_frequency = frequency;
-	last_stamp = time;
-}
-
-void cpu_linux::go_idle(uint64_t time)
-{
-
-	idle = true;
-
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
-}
-
-
-void cpu_linux::go_unidle(uint64_t time)
-{
-	idle = false;
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
 }

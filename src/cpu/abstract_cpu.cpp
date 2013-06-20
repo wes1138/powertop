@@ -28,7 +28,53 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "cpu.h"
+#include "../lib.h"
 
+void abstract_cpu::account_freq(uint64_t freq, uint64_t duration)
+{
+	struct frequency *state = NULL;
+	unsigned int i;
+
+	for (i = 0; i < pstates.size(); i++) {
+		if (freq == pstates[i]->freq) {
+			state = pstates[i];
+			break;
+		}
+	}
+
+
+	if (!state) {
+		state = new(std::nothrow) struct frequency;
+
+		if (!state)
+			return;
+
+		memset(state, 0, sizeof(*state));
+
+		pstates.push_back(state);
+
+		state->freq = freq;
+		hz_to_human(freq, state->human_name);
+		if (freq == 0)
+			strcpy(state->human_name, _("Idle"));
+		if (is_turbo(freq, max_frequency, max_minus_one_frequency))
+			sprintf(state->human_name, _("Turbo Mode"));
+
+		state->after_count = 1;
+	}
+
+
+	state->time_after += duration;
+
+
+}
+
+void abstract_cpu::freq_updated(uint64_t time)
+{
+	if(parent)
+		parent->calculate_freq(time);
+	old_idle = idle;
+}
 
 void abstract_cpu::measurement_start(void)
 {
@@ -346,22 +392,33 @@ void abstract_cpu::calculate_freq(uint64_t time)
 
 	current_frequency = freq;
 	idle = is_idle;
-	if (parent)
-		parent->calculate_freq(time);
-	old_idle = idle;
+	freq_updated(time);
 }
 
 void abstract_cpu::change_effective_frequency(uint64_t time, uint64_t frequency)
 {
 	unsigned int i;
+	uint64_t time_delta, fr;
+
+	if (last_stamp)
+		time_delta = time - last_stamp;
+	else
+		time_delta = 1;
+
+	fr = effective_frequency;
+	if (old_idle)
+		fr = 0;
+
+	account_freq(fr, time_delta);
+
+	effective_frequency = frequency;
+	last_stamp = time;
 
 	/* propagate to all children */
 	for (i = 0; i < children.size(); i++)
 		if (children[i]) {
 			children[i]->change_effective_frequency(time, frequency);
 		}
-
-	effective_frequency = frequency;
 }
 
 

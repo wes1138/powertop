@@ -83,6 +83,9 @@ protected:
 	double  time_factor;
 	uint64_t max_frequency;
 	uint64_t max_minus_one_frequency;
+
+	virtual void	account_freq(uint64_t frequency, uint64_t duration);
+	virtual void	freq_updated(uint64_t time);
 public:
 	uint64_t	last_stamp;
 	uint64_t	total_stamp;
@@ -102,6 +105,7 @@ public:
 	class abstract_cpu *parent;
 
 
+	int	get_first_cpu() { return first_cpu; }
 	void	set_number(int _number, int cpu) {this->number = _number; this->first_cpu = cpu;};
 	void	set_type(const char* _name) {this->name = _name;};
 	int	get_number(void) { return number; };
@@ -140,9 +144,9 @@ public:
 
 	/* Frequency micro accounting methods */
 	virtual void    calculate_freq(uint64_t time);
-	virtual void    go_idle(uint64_t time) { idle = true; if (parent) parent->calculate_freq(time);};
-	virtual void    go_unidle(uint64_t time) { idle = false; if (parent) parent->calculate_freq(time);};;
-	virtual void    change_freq(uint64_t time, int freq) { current_frequency = freq; if (parent) parent->calculate_freq(time);};
+	virtual void    go_idle(uint64_t time) { idle = true; freq_updated(time); }
+	virtual void    go_unidle(uint64_t time) { idle = false; freq_updated(time); }
+	virtual void    change_freq(uint64_t time, int freq) { current_frequency = freq; freq_updated(time); }
 
 	virtual void	change_effective_frequency(uint64_t time, uint64_t freq);
 
@@ -158,8 +162,6 @@ extern vector<class abstract_cpu *> all_cpus;
 
 class cpu_linux: public abstract_cpu
 {
-
-	void	account_freq(uint64_t frequency, uint64_t duration);
 	void 	parse_pstates_start(void);
 	void 	parse_cstates_start(void);
 	void 	parse_pstates_end(void);
@@ -176,17 +178,10 @@ public:
 
 	virtual char *  fill_pstate_line(int line_nr, char *buffer);
 	virtual char *  fill_pstate_name(int line_nr, char *buffer);
-
-	virtual void    change_freq(uint64_t time, int freq);
-	virtual void	change_effective_frequency(uint64_t time, uint64_t freq);
-	virtual void    go_idle(uint64_t time);
-	virtual void    go_unidle(uint64_t time);
-
 };
 
 class cpu_core: public abstract_cpu
 {
-	void		account_freq(uint64_t frequency, uint64_t duration);
 public:
 	virtual char *  fill_cstate_line(int line_nr, char *buffer, const char *separator="");
 	virtual char *  fill_cstate_name(int line_nr, char *buffer);
@@ -195,13 +190,12 @@ public:
 	virtual char *  fill_pstate_name(int line_nr, char *buffer);
 
 	virtual int     can_collapse(void) { return childcount == 1;};
-	virtual void    calculate_freq(uint64_t time);
-	virtual void	change_effective_frequency(uint64_t time, uint64_t freq);
 };
 
 class cpu_package: public abstract_cpu
 {
-	void		account_freq(uint64_t frequency, uint64_t duration);
+protected:
+	virtual void	freq_updated(uint64_t time);
 public:
 	virtual char *  fill_cstate_line(int line_nr, char *buffer, const char *separator="");
 	virtual char *  fill_cstate_name(int line_nr, char *buffer);
@@ -209,13 +203,7 @@ public:
 	virtual char *  fill_pstate_line(int line_nr, char *buffer);
 	virtual char *  fill_pstate_name(int line_nr, char *buffer);
 	virtual int     can_collapse(void) { return childcount == 1;};
-
-	virtual void    calculate_freq(uint64_t time);
-	virtual void	change_effective_frequency(uint64_t time, uint64_t freq);
-
 };
-
-#include "intel_cpus.h"
 
 extern void enumerate_cpus(void);
 
